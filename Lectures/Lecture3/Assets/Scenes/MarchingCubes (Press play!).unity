@@ -437,9 +437,10 @@ MonoBehaviour:
     - {fileID: 1229849371}
     - {fileID: 2072798780}
     BallRadius: 1
-  Generator:
-    GridSize: 4
-    Steps: 35
+  farCorner: {x: -4, y: -4, z: -4}
+  boundingCubeEdge: 8
+  smallCubeEdge: 0.15
+  normalApproximationDelta: 0.01
 --- !u!23 &1734744837
 MeshRenderer:
   m_ObjectHideFlags: 0
