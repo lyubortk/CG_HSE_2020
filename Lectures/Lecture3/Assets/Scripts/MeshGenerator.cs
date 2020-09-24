@@ -1,10 +1,9 @@
 using System.Collections.Generic;
-using UnityEngine;
 using Unity.Mathematics;
+using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter))]
-public class MeshGenerator : MonoBehaviour
-{
+public class MeshGenerator : MonoBehaviour {
     public MetaBallField Field = new MetaBallField();
 
     public Vector3 farCorner;
@@ -13,10 +12,8 @@ public class MeshGenerator : MonoBehaviour
     public float normalApproximationDelta;
 
     private float eps = 0.0001F;
-    
     private MeshFilter _filter;
     private Mesh _mesh;
-    
     private List<Vector3> vertices = new List<Vector3>();
     private List<Vector3> normals = new List<Vector3>();
     private List<int> indices = new List<int>();
@@ -24,14 +21,11 @@ public class MeshGenerator : MonoBehaviour
     /// <summary>
     /// Executed by Unity upon object initialization. <see cref="https://docs.unity3d.com/Manual/ExecutionOrder.html"/>
     /// </summary>
-    private void Awake()
-    {
+    private void Awake() {
         // Getting a component, responsible for storing the mesh
         _filter = GetComponent<MeshFilter>();
-        
         // instantiating the mesh
         _mesh = _filter.mesh = new Mesh();
-        
         // Just a little optimization, telling unity that the mesh is going to be updated frequently
         _mesh.MarkDynamic();
     }
@@ -40,19 +34,18 @@ public class MeshGenerator : MonoBehaviour
     /// Executed by Unity on every frame <see cref="https://docs.unity3d.com/Manual/ExecutionOrder.html"/>
     /// You can use it to animate something in runtime.
     /// </summary>
-    private void Update()
-    {   
+    private void Update() {
         vertices.Clear();
         indices.Clear();
         normals.Clear();
-        
+
         Field.Update();
 
         for (float dx = 0; dx + smallCubeEdge <= boundingCubeEdge + eps; dx += smallCubeEdge) {
             for (float dy = 0; dy + smallCubeEdge <= boundingCubeEdge + eps; dy += smallCubeEdge) {
                 for (float dz = 0; dz + smallCubeEdge <= boundingCubeEdge + eps; dz += smallCubeEdge) {
                     Vector3 smallCubeCorner = farCorner + new Vector3(dx, dy, dz);
-                    
+
                     int caseIndex = 0;
                     for (int vertexIndex = 0; vertexIndex < 8; vertexIndex++) {
                         Vector3 vertexPosition = smallCubeCorner + MarchingCubes.Tables._cubeVertices[vertexIndex] * smallCubeEdge;
@@ -91,7 +84,7 @@ public class MeshGenerator : MonoBehaviour
         Vector3 point2 = smallCubeCorner + MarchingCubes.Tables._cubeVertices[edgeVertices[1]] * smallCubeEdge;
         float f1 = Field.F(point1);
         float f2 = Field.F(point2);
-        Vector3 trianglePoint = Vector3.Lerp(point1, point2, -f1 / (f2 - f1)); 
+        Vector3 trianglePoint = Vector3.Lerp(point1, point2, -f1 / (f2 - f1));
 
         indices.Add(vertices.Count);
         vertices.Add(trianglePoint);
