@@ -21,6 +21,7 @@
             #include "UnityLightingCommon.cginc"
             
             #define EPS 1e-7
+            #define ITERATIONS 4000
 
             struct appdata
             {
@@ -98,10 +99,25 @@
                 // Replace this specular calculation by Montecarlo.
                 // Normalize the BRDF in such a way, that integral over a hemysphere of (BRDF * dot(normal, w')) == 1
                 // TIP: use Random(i) to get a pseudo-random value.
-                float3 viewRefl = reflect(-viewDirection.xyz, normal);
-                float3 specular = SampleColor(viewRefl);
+                // float3 viewRefl = reflect(-viewDirection.xyz, normal);
+                // float3 specular = SampleColor(viewRefl);
                 
-                return fixed4(specular, 1);
+                float3 notNormalizedColor = 0;
+                float integral = 0;
+
+                for (int i = 0; i < ITERATIONS; i++) {
+                    float cosPhi = Random(i * 2);
+                    float theta = Random(i * 2 + 1) * 2 * UNITY_PI;
+                    float sinPhi = sqrt(1 - Sqr(cosPhi));
+                    float3 lightDir = float3(sinPhi * cos(theta), sinPhi * sin(theta), cosPhi) + normal - float3(0, 0, 1);
+
+                    float cosW = dot(normal, lightDir);
+                    float brdf = GetSpecularBRDF(viewDirection, lightDir, normal);
+                    notNormalizedColor += SampleColor(lightDir) * cosW * brdf; 
+                    integral += cosW * brdf;
+                }
+
+                return fixed4(notNormalizedColor / integral, 1);
             }
             ENDCG
         }
