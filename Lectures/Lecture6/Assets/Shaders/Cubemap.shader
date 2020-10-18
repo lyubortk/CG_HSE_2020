@@ -21,7 +21,7 @@
             #include "UnityLightingCommon.cginc"
             
             #define EPS 1e-7
-            #define ITERATIONS 4000
+            #define ITERATIONS 8000
 
             struct appdata
             {
@@ -106,12 +106,16 @@
                 float integral = 0;
 
                 for (int i = 0; i < ITERATIONS; i++) {
-                    float cosPhi = Random(i * 2);
+                    float cosPhi = Random(i * 2) * 2 - 1;
                     float theta = Random(i * 2 + 1) * 2 * UNITY_PI;
                     float sinPhi = sqrt(1 - Sqr(cosPhi));
-                    float3 lightDir = float3(sinPhi * cos(theta), sinPhi * sin(theta), cosPhi) + normal - float3(0, 0, 1);
+                    float3 lightDir = float3(sinPhi * cos(theta), sinPhi * sin(theta), cosPhi);
 
                     float cosW = dot(normal, lightDir);
+                    if (cosW < 0) {
+                        lightDir = -lightDir;
+                        cosW = -cosW;
+                    }
                     float brdf = GetSpecularBRDF(viewDirection, lightDir, normal);
                     notNormalizedColor += SampleColor(lightDir) * cosW * brdf; 
                     integral += cosW * brdf;
