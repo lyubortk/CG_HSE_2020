@@ -10,6 +10,8 @@
 #define HALF_PI       1.57079632679f
 #define INV_HALF_PI   0.636619772367f
 
+#define SQRT_PI       1.77245385091f
+
 RWStructuredBuffer<float4> SH_0_1_r;
 RWStructuredBuffer<float4> SH_0_1_g;
 RWStructuredBuffer<float4> SH_0_1_b;
@@ -45,37 +47,103 @@ float3 SampleColor(float3 direction)
     return tex.rgb;
 }
 
+float HarmonicFunction(int l, int m, float3 w)
+{
+    if (l == 0) {
+        return 1 / (2 * SQRT_PI);
+    }
+
+    if (l == 1) {
+        if (m == -1) {
+            return -sqrt(3) * w.y / (2 * SQRT_PI);
+        }
+        if (m == 0) {
+            return sqrt(3) * w.z / (2 * SQRT_PI);
+        }
+        if (m == 1) {
+            return -sqrt(3) * w.x / (2 * SQRT_PI);
+        }
+    }
+
+    if (l == 2) {
+        if (m == -2) {
+            return sqrt(15) * w.y * w.x / (2 * SQRT_PI);
+        }
+        if (m == -1) {
+            return -sqrt(15) * w.y * w.z / (2 * SQRT_PI);
+        }
+        if (m == 0) {
+            return sqrt(5) * (3 * w.z * w.z - 1) / (4 * SQRT_PI);
+        }
+        if (m == 1) {
+            return -sqrt(15) * w.x * w.z / (2 * SQRT_PI);
+        }
+        if (m == 2) {
+            return sqrt(15) * (w.x * w.x - w.y * w.y) / (4 * SQRT_PI);
+        }
+    }
+    return 0;
+}
+
+float HarmonicFunctionCoefficients(int l, int m) {
+    if (l == 2 && m == 0) {
+        return sqrt(5) / (4 * SQRT_PI);
+    }
+    if (l == 2 && m == 2) {
+        return sqrt(15) / (4 * SQRT_PI);
+    }
+    return HarmonicFunction(l, m, float3(1, 1, 1));
+}
+
 [numthreads(1024, 1, 1)]
 void ComputeHarmonics(uint id : SV_DispatchThreadID)
 {
     const int THREADS = 1024;
-    const int SAMPLES = 100;
+    const int SAMPLES = 200;
     
-    // See SH.shader for more details
-    float4 results[7] = {
-        float4(0, 0, 0, 0), // SH_0_1_r
-        float4(0, 0, 0, 0), // SH_0_1_g
-        float4(0, 0, 0, 0), // SH_0_1_b
-        
-        float4(0, 0, 0, 0), // SH_2_r
-        float4(0, 0, 0, 0), // SH_2_g
-        float4(0, 0, 0, 0), // SH_2_b
-        
-        float4(0, 0, 0, 0), // SH_2_rgb
-    };
-    
+    float C[3] = {PI, TWO_PI / 3, PI / 4};
+
     // Populate results buffer using monte-carlo method.
     // You can see the Random(i) function. Use it just as with the previous task.
     
     // TASK: project light from _Env to spherical harmonic coefficients and store them in results[]
     
-    SH_0_1_r[id] = results[0];
-    SH_0_1_g[id] = results[1];
-    SH_0_1_b[id] = results[2];
+    float3 integral[3][5];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 5; j++) {
+            integral[i][j] = float3(0, 0, 0);
+        }
+    }
+
+    for (int i = 0; i < SAMPLES; i++) {
+        float cosPhi = Random(i * 2) * 2 - 1;
+        float theta = Random(i * 2 + 1) * 2 * PI;
+        float sinPhi = sqrt(1 - cosPhi * cosPhi);
+        float3 lightDir = float3(sinPhi * cos(theta), sinPhi * sin(theta), cosPhi);
+        float3 color = SampleColor(lightDir);
+
+        for (int l = 0; l <= 2; l++) {
+            for (int m = -l; m <= l; m++) {
+                integral[l][m + l] += HarmonicFunction(l, m, lightDir) * color;
+            }
+        }
+    }
+
+    for (int l = 0; l < 3; l++) {
+        for (int m = -l; m <= l; m++) {
+            integral[l][m + l] *= 1.0 / SAMPLES * 4;
+            integral[l][m + l] *= C[l];
+            integral[l][m + l] *= HarmonicFunctionCoefficients(l, m);
+        }
+    }
+
+    SH_0_1_r[id] = float4(integral[1][2].x, integral[1][0].x, integral[1][1].x, integral[0][0].x);
+    SH_0_1_g[id] = float4(integral[1][2].y, integral[1][0].y, integral[1][1].y, integral[0][0].y);
+    SH_0_1_b[id] = float4(integral[1][2].z, integral[1][0].z, integral[1][1].z, integral[0][0].z);
     
-    SH_2_r[id] = results[3];
-    SH_2_g[id] = results[4];
-    SH_2_b[id] = results[5];    
+    SH_2_r[id] = float4(integral[2][0].x, integral[2][1].x, integral[2][3].x, integral[2][2].x);
+    SH_2_g[id] = float4(integral[2][0].y, integral[2][1].y, integral[2][3].y, integral[2][2].y);
+    SH_2_b[id] = float4(integral[2][0].z, integral[2][1].z, integral[2][3].z, integral[2][2].z);    
     
-    SH_2_rgb[id] = results[6];
+    SH_2_rgb[id] = float4(integral[2][4].x, integral[2][4].y, integral[2][4].z, 0);
 }

@@ -21,7 +21,7 @@
             #include "UnityLightingCommon.cginc"
             
             #define EPS 1e-7
-            #define ITERATIONS 8000
+            #define ITERATIONS 100
 
             struct appdata
             {
