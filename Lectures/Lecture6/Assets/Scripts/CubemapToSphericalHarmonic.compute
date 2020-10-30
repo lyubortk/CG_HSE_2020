@@ -49,40 +49,31 @@ float3 SampleColor(float3 direction)
 
 float HarmonicFunction(int l, int m, float3 w)
 {
+    float res = 0;
     if (l == 0) {
-        return 1 / (2 * SQRT_PI);
-    }
-
-    if (l == 1) {
+        res = 1;
+    } else if (l == 1) {
         if (m == -1) {
-            return -sqrt(3) * w.y / (2 * SQRT_PI);
+            res = -sqrt(3) * w.y;
+        } else if (m == 0) {
+            res = sqrt(3) * w.z;
+        } else if (m == 1) {
+            res = -sqrt(3) * w.x;
         }
-        if (m == 0) {
-            return sqrt(3) * w.z / (2 * SQRT_PI);
-        }
-        if (m == 1) {
-            return -sqrt(3) * w.x / (2 * SQRT_PI);
-        }
-    }
-
-    if (l == 2) {
+    } else if (l == 2) {
         if (m == -2) {
-            return sqrt(15) * w.y * w.x / (2 * SQRT_PI);
-        }
-        if (m == -1) {
-            return -sqrt(15) * w.y * w.z / (2 * SQRT_PI);
-        }
-        if (m == 0) {
-            return sqrt(5) * (3 * w.z * w.z - 1) / (4 * SQRT_PI);
-        }
-        if (m == 1) {
-            return -sqrt(15) * w.x * w.z / (2 * SQRT_PI);
-        }
-        if (m == 2) {
-            return sqrt(15) * (w.x * w.x - w.y * w.y) / (4 * SQRT_PI);
+            res = sqrt(15) * w.y * w.x;
+        } else if (m == -1) {
+            res = -sqrt(15) * w.y * w.z;
+        } else if (m == 0) {
+            res = sqrt(5) * (3 * w.z * w.z - 1) / 2;
+        } else if (m == 1) {
+            res = -sqrt(15) * w.x * w.z;
+        } else if (m == 2) {
+            res = sqrt(15) * (w.x * w.x - w.y * w.y) / 2;
         }
     }
-    return 0;
+    return res / (2 * SQRT_PI);
 }
 
 float HarmonicFunctionCoefficients(int l, int m) {
@@ -99,7 +90,7 @@ float HarmonicFunctionCoefficients(int l, int m) {
 void ComputeHarmonics(uint id : SV_DispatchThreadID)
 {
     const int THREADS = 1024;
-    const int SAMPLES = 200;
+    const int SAMPLES = 6000;
     
     float C[3] = {PI, TWO_PI / 3, PI / 4};
 
