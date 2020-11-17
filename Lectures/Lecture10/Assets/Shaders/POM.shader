@@ -30,6 +30,9 @@
         // texture coordinate for the normal map
         float2 uv : TEXCOORD5;
         float4 clip : SV_POSITION;
+
+        half3x3 tangentToWorld : TEXCOORD1;
+        half3x3 objectToTangent : TEXCOORD6;
     };
 
     // Vertex shader now also gets a per-vertex tangent vector.
@@ -41,12 +44,19 @@
         o.worldPos = mul(unity_ObjectToWorld, vertex).xyz;
         half3 wNormal = UnityObjectToWorldNormal(normal);
         half3 wTangent = UnityObjectToWorldDir(tangent.xyz);
-        
+
         o.uv = uv;
-        o.worldSurfaceNormal = normal;
+        o.worldSurfaceNormal = normalize(wNormal);
         
         // compute bitangent from cross product of normal and tangent and output it
-        
+        half tangentSign = tangent.w * unity_WorldTransformParams.w;
+        half3 wBitangent = cross(wNormal, wTangent) * tangentSign;
+        o.tangentToWorld = half3x3(wTangent.x, wBitangent.x, wNormal.x,
+                                   wTangent.y, wBitangent.y, wNormal.y,
+                                   wTangent.z, wBitangent.z, wNormal.z);
+
+        half3 bitangent = cross(normal, tangent.xyz) * tangentSign;
+        o.objectToTangent = half3x3(tangent.xyz, bitangent, normal);
         return o;
     }
 
@@ -71,11 +81,38 @@
         float3 worldViewDir = normalize(i.worldPos.xyz - _WorldSpaceCameraPos.xyz);
 #if MODE_BUMP
         // Change UV according to the Parallax Offset Mapping
+        float angle_cos = dot(-worldViewDir.xyz, i.worldSurfaceNormal);
+        float height = tex2D(_HeightMap, uv) * _MaxHeight;
+        float cathetus = (_MaxHeight - height);
+        float hypo = 1 / angle_cos * cathetus;
+        float shift = (1 - angle_cos * angle_cos) * hypo;
+        uv -= shift * normalize(mul(i.objectToTangent, UnityWorldToObjectDir(-worldViewDir)).xy);
 #endif   
     
         float depthDif = 0;
 #if MODE_POM | MODE_POM_SHADOWS    
         // Change UV according to Parallax Occclusion Mapping
+        float3 uv_step_dir = normalize(mul(i.objectToTangent, UnityWorldToObjectDir(worldViewDir)));
+        float point_height = _MaxHeight;
+        bool need_break = false;
+        float2 new_uv = uv;
+
+        for (int j = 0; j < _MaxStepCount; j++) {
+            half uv_height = tex2D(_HeightMap, new_uv) * _MaxHeight;
+            if (uv_height >= point_height && !need_break) { // break does not work for some reason
+                need_break = true;
+            }
+            if (!need_break) {
+                new_uv += _StepLength * uv_step_dir.xy;
+                point_height += _StepLength * uv_step_dir.z;
+            }
+        }
+
+        // linear approximation
+        float new_uv_height = tex2D(_HeightMap, new_uv) * _MaxHeight;
+        float uv_height = tex2D(_HeightMap, uv) * _MaxHeight;
+        uv = uv + (new_uv - uv) *
+        clamp((new_uv_height - point_height + _MaxHeight - uv_height) / (_MaxHeight - uv_height), 0.0, 1.0);
 #endif
 
         float3 worldLightDir = normalize(_WorldSpaceLightPos0.xyz);
@@ -86,7 +123,8 @@
         
         half3 normal = i.worldSurfaceNormal;
 #if !MODE_PLAIN
-        // Implement Normal Mapping
+        half3 tnormal = UnpackNormal(tex2D(_NormalMap, uv));
+        normal = mul(i.tangentToWorld, tnormal);
 #endif
 
         // Diffuse lightning
